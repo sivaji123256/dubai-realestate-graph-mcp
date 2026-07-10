@@ -256,3 +256,172 @@ def price_trend(area: str) -> list:
         """,
         area=area,
     )
+
+
+def citywide_kpis() -> dict:
+    """Overall KPIs across the whole graph: total transactions, avg price,
+    avg price/sqm, distinct areas covered, and the transaction date range --
+    for the dashboard's KPI cards."""
+    stats = run_read(
+        """
+        MATCH (t:Transaction)
+        RETURN count(t) AS total_transactions,
+               avg(t.price) AS avg_price,
+               avg(t.price_per_sqm) AS avg_price_per_sqm,
+               toString(min(t.date)) AS earliest,
+               toString(max(t.date)) AS latest
+        """
+    )
+    area_count = run_read("MATCH (a:Area) RETURN count(a) AS c")
+    result = stats[0] if stats else {}
+    result["area_count"] = area_count[0]["c"] if area_count else 0
+    return result
+
+
+def top_areas_by_volume(limit: int = 10) -> list:
+    """Areas ranked by sale transaction volume, with avg price/sqm -- for the
+    dashboard's top-areas chart."""
+    return run_read(
+        """
+        MATCH (t:Transaction)-[:IN_AREA]->(a:Area)
+        RETURN a.name AS area, count(t) AS transaction_count,
+               avg(t.price_per_sqm) AS avg_price_per_sqm
+        ORDER BY transaction_count DESC
+        LIMIT $limit
+        """,
+        limit=limit,
+    )
+
+
+def citywide_monthly_trend() -> list:
+    """Citywide monthly transaction count and average price/sqm trend, across
+    all areas -- for the dashboard's overview chart."""
+    return run_read(
+        """
+        MATCH (t:Transaction)
+        WITH substring(toString(t.date), 0, 7) AS month, t
+        RETURN month, count(t) AS transaction_count,
+               avg(t.price_per_sqm) AS avg_price_per_sqm
+        ORDER BY month
+        """
+    )
+
+
+def dataset_versions() -> list:
+    """Ingestion run history -- when the graph was loaded/refreshed, and what
+    date range and row count each run covered. Written by
+    ingestion/load_neo4j.py on every successful load."""
+    return run_read(
+        """
+        MATCH (v:DatasetVersion)
+        RETURN toString(v.loaded_at) AS loaded_at, v.row_count AS row_count,
+               toString(v.date_range_start) AS date_range_start,
+               toString(v.date_range_end) AS date_range_end, v.source AS source
+        ORDER BY v.loaded_at DESC
+        """
+    )
+
+
+def area_subgraph(area: str, max_buildings: int = 25) -> dict:
+    """Live subgraph around an area: its top buildings by transaction volume,
+    their project/master project chain, and the metro stations, malls, and
+    property types connected to transactions in the area. Transaction nodes
+    themselves are excluded (there can be thousands -- not visually
+    meaningful); this surfaces the reference-entity structure around the
+    area instead. Node-to-node edges here are derived for visualization
+    (aggregated from shared transactions), except Building-PART_OF->Project
+    and Project-PART_OF->MasterProject, which are literal graph edges."""
+    resolved = resolve_area(area)
+
+    buildings = run_read(
+        """
+        MATCH (t:Transaction)-[:IN_AREA]->(a:Area)
+        WHERE toLower(a.name) = toLower($area)
+        MATCH (t)-[:IN_BUILDING]->(b:Building)
+        WITH b, count(t) AS cnt
+        ORDER BY cnt DESC
+        LIMIT $max_buildings
+        OPTIONAL MATCH (b)-[:PART_OF]->(p:Project)
+        OPTIONAL MATCH (p)-[:PART_OF]->(mp:MasterProject)
+        RETURN b.name AS building, cnt AS building_txn_count,
+               p.name AS project, mp.name AS master_project
+        """,
+        area=resolved,
+        max_buildings=max_buildings,
+    )
+    metros = run_read(
+        """
+        MATCH (t:Transaction)-[:IN_AREA]->(a:Area)
+        WHERE toLower(a.name) = toLower($area)
+        MATCH (t)-[:NEAR_METRO]->(m:MetroStation)
+        RETURN m.name AS metro, count(t) AS cnt
+        ORDER BY cnt DESC LIMIT 5
+        """,
+        area=resolved,
+    )
+    malls = run_read(
+        """
+        MATCH (t:Transaction)-[:IN_AREA]->(a:Area)
+        WHERE toLower(a.name) = toLower($area)
+        MATCH (t)-[:NEAR_MALL]->(ml:Mall)
+        RETURN ml.name AS mall, count(t) AS cnt
+        ORDER BY cnt DESC LIMIT 5
+        """,
+        area=resolved,
+    )
+    ptypes = run_read(
+        """
+        MATCH (t:Transaction)-[:IN_AREA]->(a:Area)
+        WHERE toLower(a.name) = toLower($area)
+        MATCH (t)-[:OF_TYPE]->(pt:PropertyType)
+        RETURN pt.name AS property_type, count(t) AS cnt
+        ORDER BY cnt DESC
+        """,
+        area=resolved,
+    )
+
+    nodes = {}
+    edges = []
+
+    def add_node(node_id, label, ntype, **extra):
+        if node_id not in nodes:
+            nodes[node_id] = {"id": node_id, "label": label, "type": ntype, **extra}
+        return node_id
+
+    area_id = add_node(f"area:{resolved}", resolved, "Area")
+
+    for row in buildings:
+        b_id = add_node(
+            f"building:{row['building']}", row["building"], "Building",
+            transaction_count=row["building_txn_count"],
+        )
+        edges.append({"from": area_id, "to": b_id, "label": "HAS_BUILDING"})
+        if row["project"]:
+            p_id = add_node(f"project:{row['project']}", row["project"], "Project")
+            edges.append({"from": b_id, "to": p_id, "label": "PART_OF"})
+            if row["master_project"]:
+                mp_id = add_node(
+                    f"masterproject:{row['master_project']}", row["master_project"], "MasterProject"
+                )
+                edges.append({"from": p_id, "to": mp_id, "label": "PART_OF"})
+
+    for row in metros:
+        m_id = add_node(
+            f"metro:{row['metro']}", row["metro"], "MetroStation", transaction_count=row["cnt"]
+        )
+        edges.append({"from": area_id, "to": m_id, "label": "NEAR_METRO"})
+
+    for row in malls:
+        ml_id = add_node(
+            f"mall:{row['mall']}", row["mall"], "Mall", transaction_count=row["cnt"]
+        )
+        edges.append({"from": area_id, "to": ml_id, "label": "NEAR_MALL"})
+
+    for row in ptypes:
+        pt_id = add_node(
+            f"ptype:{row['property_type']}", row["property_type"], "PropertyType",
+            transaction_count=row["cnt"],
+        )
+        edges.append({"from": area_id, "to": pt_id, "label": "OF_TYPE"})
+
+    return {"resolved_area_name": resolved, "nodes": list(nodes.values()), "edges": edges}

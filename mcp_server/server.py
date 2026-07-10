@@ -24,7 +24,7 @@ from mcp.server.fastmcp import FastMCP
 import graph_queries as gq
 from neo4j_client import run_read
 
-mcp = FastMCP("dubai-realestate")
+mcp = FastMCP("aqariq")
 
 _WRITE_KEYWORDS = (
     "CREATE",

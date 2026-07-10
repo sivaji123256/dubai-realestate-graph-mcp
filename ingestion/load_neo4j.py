@@ -144,6 +144,31 @@ def report_counts(driver):
         print(f"    {row['label']}: {row['c']:,}")
 
 
+def record_dataset_version(driver, row_count):
+    """Persist a record of this ingestion run in the graph itself -- a real,
+    queryable history of when the data was refreshed and what it covered."""
+    with driver.session() as session:
+        date_range = session.run(
+            "MATCH (t:Transaction) RETURN min(t.date) AS earliest, max(t.date) AS latest"
+        ).single()
+        session.run(
+            """
+            CREATE (:DatasetVersion {
+                loaded_at: datetime(),
+                row_count: $row_count,
+                date_range_start: $start,
+                date_range_end: $end,
+                source: $source
+            })
+            """,
+            row_count=row_count,
+            start=date_range["earliest"],
+            end=date_range["latest"],
+            source="kaggle:waelr1985/dubai-real-estate-transaction (DLD Transactions.csv)",
+        )
+    print(f"Recorded DatasetVersion: {row_count:,} rows, {date_range['earliest']}..{date_range['latest']}")
+
+
 def main():
     load_dotenv()
     uri = os.environ["NEO4J_URI"]
@@ -161,6 +186,7 @@ def main():
         print(f"Done: {total:,} transaction rows processed.")
 
         report_counts(driver)
+        record_dataset_version(driver, total)
     finally:
         driver.close()
 

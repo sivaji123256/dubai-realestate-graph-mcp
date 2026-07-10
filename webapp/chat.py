@@ -3,6 +3,7 @@ import logging
 
 from openai import OpenAI
 
+from . import metrics
 from .config import OPENAI_API_KEY, OPENAI_MODEL
 from .openai_tools import TOOL_SCHEMAS, call_tool
 
@@ -36,6 +37,7 @@ MAX_HISTORY_MESSAGES = 20
 
 
 def run_chat(message: str, history: list) -> str:
+    metrics.record_chat_message()
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages.extend(history[-MAX_HISTORY_MESSAGES:])
     messages.append({"role": "user", "content": message})
@@ -47,6 +49,8 @@ def run_chat(message: str, history: list) -> str:
             tools=TOOL_SCHEMAS,
             max_tokens=MAX_TOKENS,
         )
+        if response.usage:
+            metrics.record_tokens(response.usage.prompt_tokens, response.usage.completion_tokens)
         msg = response.choices[0].message
 
         if not msg.tool_calls:

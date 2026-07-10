@@ -3,32 +3,100 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dubai Real Estate Graph Assistant</title>
+  <title>AqarIQ — Dubai Real Estate Intelligence</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230b1220'/%3E%3Ctext x='50' y='68' font-size='58' font-family='Georgia,serif' font-weight='bold' fill='%23c9a24b' text-anchor='middle'%3EA%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/vis-network@9/styles/vis-network.min.css" />
+  <script src="https://unpkg.com/vis-network@9/standalone/umd/vis-network.min.js"></script>
 </head>
 <body>
   <div id="login-screen" class="screen">
     <form id="login-form" class="login-card">
-      <h1>Dubai Real Estate Graph Assistant</h1>
-      <p class="subtitle">Ask about Dubai's property market, backed by real DLD transaction data.</p>
+      <div class="brand-mark">Aqar<span>IQ</span></div>
+      <p class="subtitle">Dubai real-estate market intelligence, backed by a live Neo4j graph of official DLD transactions.</p>
       <input id="password-input" type="password" placeholder="Password" autocomplete="current-password" required />
       <button type="submit">Enter</button>
       <p id="login-error" class="error"></p>
     </form>
   </div>
 
-  <div id="chat-screen" class="screen hidden">
-    <header>
-      <h1>Dubai Real Estate Graph Assistant</h1>
-      <p class="subtitle">Live Neo4j graph of official DLD Sales transactions</p>
-    </header>
-    <main id="messages"></main>
-    <form id="chat-form">
-      <input id="chat-input" type="text" placeholder="e.g. Compare Marsa Dubai and Palm Jumeirah" autocomplete="off" />
-      <button type="submit">Send</button>
-    </form>
+  <div id="app-shell" class="screen hidden">
+    <aside class="sidebar">
+      <div class="brand-mark small">Aqar<span>IQ</span></div>
+      <nav>
+        <button class="nav-btn active" data-panel="chat">Chat</button>
+        <button class="nav-btn" data-panel="dashboard">Dashboard</button>
+        <button class="nav-btn" data-panel="graph">Graph Explorer</button>
+        <button class="nav-btn" data-panel="health">System Health</button>
+      </nav>
+      <button id="logout-btn" class="logout-btn">Log out</button>
+    </aside>
+
+    <main class="content">
+      <!-- Chat panel -->
+      <section id="panel-chat" class="panel active">
+        <header class="panel-header">
+          <h1>Chat</h1>
+          <p class="subtitle">Ask about Dubai's property market in plain English</p>
+        </header>
+        <div id="messages"></div>
+        <form id="chat-form">
+          <input id="chat-input" type="text" placeholder="e.g. Compare Dubai Marina and Palm Jumeirah" autocomplete="off" />
+          <button type="submit">Send</button>
+        </form>
+      </section>
+
+      <!-- Dashboard panel -->
+      <section id="panel-dashboard" class="panel">
+        <header class="panel-header">
+          <h1>Dashboard</h1>
+          <p class="subtitle">Live market overview from the current dataset</p>
+        </header>
+        <div id="kpi-cards" class="kpi-grid"></div>
+        <div class="chart-grid">
+          <div class="chart-card">
+            <h3>Top areas by sales volume</h3>
+            <canvas id="chart-top-areas"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Citywide price/sqm trend</h3>
+            <canvas id="chart-price-trend"></canvas>
+          </div>
+        </div>
+        <p id="dataset-version" class="footnote"></p>
+      </section>
+
+      <!-- Graph Explorer panel -->
+      <section id="panel-graph" class="panel">
+        <header class="panel-header">
+          <h1>Graph Explorer</h1>
+          <p class="subtitle">Live subgraph of an area: buildings, projects, metro, malls, property types</p>
+        </header>
+        <select id="area-select"><option value="">Select an area…</option></select>
+        <div id="graph-canvas"></div>
+        <div class="legend" id="graph-legend"></div>
+      </section>
+
+      <!-- System Health panel -->
+      <section id="panel-health" class="panel">
+        <header class="panel-header">
+          <h1>System Health</h1>
+          <p class="subtitle">In-process metrics — resets on redeploy</p>
+        </header>
+        <div id="health-cards" class="kpi-grid"></div>
+        <div class="chart-card">
+          <h3>Recent request latency (ms)</h3>
+          <canvas id="chart-latency"></canvas>
+        </div>
+      </section>
+    </main>
   </div>
 
   <script src="/static/app.js"></script>
+  <script src="/static/chat.js"></script>
+  <script src="/static/dashboard.js"></script>
+  <script src="/static/graph.js"></script>
+  <script src="/static/health.js"></script>
 </body>
 </html>

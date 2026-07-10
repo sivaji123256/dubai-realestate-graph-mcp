@@ -1,11 +1,13 @@
-# Dubai Real Estate Knowledge Graph (Neo4j + MCP + Web App)
+# AqarIQ — Dubai Real Estate Market Intelligence (Neo4j + MCP + Web App)
 
 A Neo4j graph of real Dubai Land Department (DLD) sale transactions, exposed
 two ways:
 
 - **`mcp_server/`** — an MCP server for Claude Code / Claude Desktop
-- **`webapp/`** — a standalone public web app (FastAPI + OpenAI function
-  calling + a simple chat UI), password-protected, deployable to Render
+- **`webapp/`** — **AqarIQ**, a standalone public product (FastAPI + OpenAI
+  function calling): a chat assistant, an analytics dashboard, a live graph
+  explorer, and a system-health view, all password-protected and deployable
+  to Render
 
 Both share the same query logic (`graph_queries.py`) against the same Neo4j
 graph. Ask things like:
@@ -52,6 +54,11 @@ safe.
 (:Building)-[:PART_OF]->(:Project {name})-[:PART_OF]->(:MasterProject {name})
 ```
 
+Every successful `ingestion/load_neo4j.py` run also writes a
+`(:DatasetVersion {loaded_at, row_count, date_range_start, date_range_end, source})`
+node — a persistent, queryable ingestion history living in the graph itself
+(`graph_queries.dataset_versions()`, shown on the AqarIQ dashboard).
+
 ## Setup
 
 ```bash
@@ -74,10 +81,21 @@ python3 -m pip install -r requirements.txt
    claude mcp add dubai-realestate -- python3 <absolute-path>/mcp_server/server.py
    ```
 
-## Public web app (`webapp/`)
+## AqarIQ web app (`webapp/`)
 
 A FastAPI backend that runs an OpenAI tool-calling loop over `graph_queries.py`,
-served behind a simple password gate, plus a vanilla HTML/JS chat frontend.
+served behind a simple password gate, with four panels:
+
+- **Chat** — natural-language Q&A over the graph
+- **Dashboard** — KPI cards + top-areas and citywide price-trend charts
+  (Chart.js), with the current `DatasetVersion` shown for provenance
+- **Graph Explorer** — pick an area, see its live subgraph (buildings,
+  project/master project, metro, mall, property types) rendered with
+  vis-network. All Neo4j access stays server-side (`/api/graph/area-subgraph`)
+  — the browser never receives DB credentials
+- **System Health** — in-process request/latency/error metrics and an
+  estimated OpenAI spend, from `webapp/metrics.py` (resets on redeploy)
+
 `run_cypher` is intentionally **not** exposed here (no raw-Cypher surface for
 public users) — only the domain-specific tools.
 
@@ -87,7 +105,7 @@ public users) — only the domain-specific tools.
 python3 -m pip install -r webapp/requirements.txt
 ```
 
-Add to `.env`: `OPENAI_API_KEY`, `OPENAI_MODEL` (default `gpt-4o-mini`),
+Add to `.env`: `OPENAI_API_KEY`, `OPENAI_MODEL` (default `gpt-4o`),
 `APP_PASSWORD`, `SESSION_SECRET` (random string), `COOKIE_SECURE` (`false`
 locally, `true` in production).
 
