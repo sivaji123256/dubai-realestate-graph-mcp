@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "dubai-realestate": {
+      "command": "C:\\Users\\sivaj\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\python.exe",
+      "args": [
+        "C:\\Users\\sivaj\\Downloads\\claude-code-projects\\dubai-realestate-graph-mcp\\mcp_server\\server.py"
+      ]
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-07-10T11:52:03.890536",
+  "source": "kaggle:waelr1985/dubai-real-estate-transaction (DLD Transactions.csv)",
+  "filter": {
+    "trans_group_en": "Sales",
+    "months": [
+      "2025-12",
+      "2026-01",
+      "2026-02"
+    ]
+  },
+  "row_count": 47093,
+  "distinct_reference_entities": {
+    "area_name_en": 142,
+    "building_name_en": 3462,
+    "project_name_en": 2515,
+    "master_project_en": 142,
+    "property_type_en": 4,
+    "property_sub_type_en": 11,
+    "nearest_metro_en": 52,
+    "nearest_mall_en": 5,
+    "nearest_landmark_en": 13
+  },
+  "estimated_node_count": 53439,
+  "estimated_relationship_count": 258543,
+  "aura_free_limits": {
+    "nodes": 200000,
+    "relationships": 400000
+  }
+}
