@@ -1,7 +1,14 @@
-# Dubai Real Estate Knowledge Graph (Neo4j + MCP)
+# Dubai Real Estate Knowledge Graph (Neo4j + MCP + Web App)
 
 A Neo4j graph of real Dubai Land Department (DLD) sale transactions, exposed
-to LLMs through an MCP server. Ask things like:
+two ways:
+
+- **`mcp_server/`** — an MCP server for Claude Code / Claude Desktop
+- **`webapp/`** — a standalone public web app (FastAPI + OpenAI function
+  calling + a simple chat UI), password-protected, deployable to Render
+
+Both share the same query logic (`graph_queries.py`) against the same Neo4j
+graph. Ask things like:
 
 - "What's the average price per sqm in Business Bay?"
 - "Compare JVC and Dubai Marina."
@@ -66,6 +73,43 @@ python3 -m pip install -r requirements.txt
    ```bash
    claude mcp add dubai-realestate -- python3 <absolute-path>/mcp_server/server.py
    ```
+
+## Public web app (`webapp/`)
+
+A FastAPI backend that runs an OpenAI tool-calling loop over `graph_queries.py`,
+served behind a simple password gate, plus a vanilla HTML/JS chat frontend.
+`run_cypher` is intentionally **not** exposed here (no raw-Cypher surface for
+public users) — only the domain-specific tools.
+
+### Run locally
+
+```bash
+python3 -m pip install -r webapp/requirements.txt
+```
+
+Add to `.env`: `OPENAI_API_KEY`, `OPENAI_MODEL` (default `gpt-4o-mini`),
+`APP_PASSWORD`, `SESSION_SECRET` (random string), `COOKIE_SECURE` (`false`
+locally, `true` in production).
+
+```bash
+python3 -m uvicorn webapp.main:app --reload
+```
+
+Open http://127.0.0.1:8000, enter the password, chat.
+
+### Deploy to Render
+
+`render.yaml` at the project root defines the service (Python web service,
+`webapp/requirements.txt`, `uvicorn webapp.main:app`). To deploy:
+
+1. Push this repo to GitHub (already done if you're reading this from there).
+2. On [render.com](https://render.com): **New +** → **Blueprint** → connect
+   this repo. Render reads `render.yaml` automatically.
+3. Fill in the env vars Render prompts for (marked `sync: false` in the
+   blueprint): `OPENAI_API_KEY`, `NEO4J_URI`, `NEO4J_PASSWORD`, `APP_PASSWORD`,
+   `SESSION_SECRET`.
+4. Deploy. First request after idle may be slow (~30-60s cold start on the
+   free tier).
 
 ## Refreshing with newer data
 
