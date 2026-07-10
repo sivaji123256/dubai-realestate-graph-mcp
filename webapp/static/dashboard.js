@@ -1,6 +1,8 @@
 let topAreasChart = null;
 let priceTrendChart = null;
 
+document.getElementById("print-dashboard-btn").addEventListener("click", () => window.print());
+
 function fmtAED(n) {
   if (n === null || n === undefined) return "—";
   return "AED " + Math.round(n).toLocaleString();

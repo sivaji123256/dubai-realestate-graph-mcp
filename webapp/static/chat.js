@@ -1,13 +1,50 @@
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
 const messagesEl = document.getElementById("messages");
+const quickPromptsEl = document.getElementById("quick-prompts");
 
 let chatHistory = [];
+
+const QUICK_PROMPTS = [
+  { label: "Market snapshot", template: "Give me a market snapshot for " },
+  { label: "Compare two areas", template: "Compare " },
+  { label: "Near a metro station", template: "Which areas have the most sales activity near " },
+  { label: "Recent listings under budget", template: "Show me recent transactions under 2 million AED in " },
+];
+
+QUICK_PROMPTS.forEach((p) => {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "quick-prompt-btn";
+  btn.textContent = p.label;
+  btn.addEventListener("click", () => {
+    chatInput.value = p.template;
+    chatInput.focus();
+  });
+  quickPromptsEl.appendChild(btn);
+});
 
 function addMessage(role, text, opts = {}) {
   const el = document.createElement("div");
   el.className = `msg ${role}` + (opts.pending ? " pending" : "") + (opts.error ? " error" : "");
-  el.textContent = text;
+
+  const textEl = document.createElement("span");
+  textEl.textContent = text;
+  el.appendChild(textEl);
+
+  if (role === "assistant" && !opts.pending && !opts.error) {
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "copy-btn no-print";
+    copyBtn.textContent = "Copy";
+    copyBtn.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(text);
+      copyBtn.textContent = "Copied!";
+      setTimeout(() => (copyBtn.textContent = "Copy"), 1500);
+    });
+    el.appendChild(copyBtn);
+  }
+
   messagesEl.appendChild(el);
   messagesEl.scrollTop = messagesEl.scrollHeight;
   return el;

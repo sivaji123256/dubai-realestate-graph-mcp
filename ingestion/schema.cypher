@@ -11,3 +11,4 @@ CREATE CONSTRAINT property_subtype_name IF NOT EXISTS FOR (pst:PropertySubType) 
 CREATE CONSTRAINT metro_name IF NOT EXISTS FOR (ms:MetroStation) REQUIRE ms.name IS UNIQUE;
 CREATE CONSTRAINT mall_name IF NOT EXISTS FOR (ml:Mall) REQUIRE ml.name IS UNIQUE;
 CREATE CONSTRAINT landmark_name IF NOT EXISTS FOR (l:Landmark) REQUIRE l.name IS UNIQUE;
+CREATE CONSTRAINT user_email IF NOT EXISTS FOR (u:User) REQUIRE u.email IS UNIQUE;

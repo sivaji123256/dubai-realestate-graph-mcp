@@ -18,8 +18,6 @@ services:
         value: neo4j
       - key: NEO4J_PASSWORD
         sync: false
-      - key: APP_PASSWORD
-        sync: false
       - key: SESSION_SECRET
         sync: false
       - key: COOKIE_SECURE

@@ -15,8 +15,9 @@
     <form id="login-form" class="login-card">
       <div class="brand-mark">Aqar<span>IQ</span></div>
       <p class="subtitle">Dubai real-estate market intelligence, backed by a live Neo4j graph of official DLD transactions.</p>
+      <input id="email-input" type="email" placeholder="Work email" autocomplete="username" required />
       <input id="password-input" type="password" placeholder="Password" autocomplete="current-password" required />
-      <button type="submit">Enter</button>
+      <button type="submit">Sign in</button>
       <p id="login-error" class="error"></p>
     </form>
   </div>
@@ -28,8 +29,10 @@
         <button class="nav-btn active" data-panel="chat">Chat</button>
         <button class="nav-btn" data-panel="dashboard">Dashboard</button>
         <button class="nav-btn" data-panel="graph">Graph Explorer</button>
-        <button class="nav-btn" data-panel="health">System Health</button>
+        <button class="nav-btn admin-only hidden" data-panel="team">Team</button>
+        <button class="nav-btn admin-only hidden" data-panel="health">System Health</button>
       </nav>
+      <div id="user-badge" class="user-badge"></div>
       <button id="logout-btn" class="logout-btn">Log out</button>
     </aside>
 
@@ -40,6 +43,7 @@
           <h1>Chat</h1>
           <p class="subtitle">Ask about Dubai's property market in plain English</p>
         </header>
+        <div id="quick-prompts" class="quick-prompts"></div>
         <div id="messages"></div>
         <form id="chat-form">
           <input id="chat-input" type="text" placeholder="e.g. Compare Dubai Marina and Palm Jumeirah" autocomplete="off" />
@@ -49,10 +53,14 @@
 
       <!-- Dashboard panel -->
       <section id="panel-dashboard" class="panel">
-        <header class="panel-header">
-          <h1>Dashboard</h1>
-          <p class="subtitle">Live market overview from the current dataset</p>
+        <header class="panel-header no-print">
+          <div>
+            <h1>Dashboard</h1>
+            <p class="subtitle">Live market overview from the current dataset</p>
+          </div>
+          <button id="print-dashboard-btn" class="secondary-btn">Print / Save as PDF</button>
         </header>
+        <div id="print-title" class="print-only">AqarIQ — Dubai Market Snapshot</div>
         <div id="kpi-cards" class="kpi-grid"></div>
         <div class="chart-grid">
           <div class="chart-card">
@@ -78,7 +86,32 @@
         <div class="legend" id="graph-legend"></div>
       </section>
 
-      <!-- System Health panel -->
+      <!-- Team panel (admin only) -->
+      <section id="panel-team" class="panel">
+        <header class="panel-header">
+          <h1>Team</h1>
+          <p class="subtitle">Manage rep accounts and see who's using AqarIQ</p>
+        </header>
+        <form id="add-user-form" class="inline-form">
+          <input id="new-user-name" type="text" placeholder="Name" required />
+          <input id="new-user-email" type="email" placeholder="Email" required />
+          <input id="new-user-password" type="text" placeholder="Temp password" required />
+          <select id="new-user-role">
+            <option value="rep">Rep</option>
+            <option value="admin">Admin</option>
+          </select>
+          <button type="submit">Add rep</button>
+        </form>
+        <p id="add-user-error" class="error"></p>
+        <table id="team-table" class="team-table">
+          <thead>
+            <tr><th>Name</th><th>Email</th><th>Role</th><th>Messages</th><th>Last active</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="team-table-body"></tbody>
+        </table>
+      </section>
+
+      <!-- System Health panel (admin only) -->
       <section id="panel-health" class="panel">
         <header class="panel-header">
           <h1>System Health</h1>
@@ -97,6 +130,7 @@
   <script src="/static/chat.js"></script>
   <script src="/static/dashboard.js"></script>
   <script src="/static/graph.js"></script>
+  <script src="/static/team.js"></script>
   <script src="/static/health.js"></script>
 </body>
 </html>

@@ -24,3 +24,10 @@ def run_read(query, **params):
     with driver.session(default_access_mode="READ") as session:
         result = session.run(query, **params)
         return [record.data() for record in result]
+
+
+def run_write(query, **params):
+    driver = get_driver()
+    with driver.session(default_access_mode="WRITE") as session:
+        result = session.run(query, **params)
+        return [record.data() for record in result]

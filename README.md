@@ -81,23 +81,44 @@ python3 -m pip install -r requirements.txt
    claude mcp add dubai-realestate -- python3 <absolute-path>/mcp_server/server.py
    ```
 
-## AqarIQ web app (`webapp/`)
+## AqarIQ web app (`webapp/`) — sales enablement product
 
 A FastAPI backend that runs an OpenAI tool-calling loop over `graph_queries.py`,
-served behind a simple password gate, with four panels:
+positioned as an internal tool for a real estate developer's sales team
+(individual rep accounts, not a shared password), with five panels:
 
-- **Chat** — natural-language Q&A over the graph
+- **Chat** — natural-language Q&A over the graph, with quick-prompt shortcuts
+  and a copy button on replies for pasting into a client WhatsApp/email
+  mid-call
 - **Dashboard** — KPI cards + top-areas and citywide price-trend charts
-  (Chart.js), with the current `DatasetVersion` shown for provenance
+  (Chart.js), the current `DatasetVersion` for provenance, and a
+  Print/Save-as-PDF button for a client-ready one-pager
 - **Graph Explorer** — pick an area, see its live subgraph (buildings,
   project/master project, metro, mall, property types) rendered with
   vis-network. All Neo4j access stays server-side (`/api/graph/area-subgraph`)
   — the browser never receives DB credentials
-- **System Health** — in-process request/latency/error metrics and an
-  estimated OpenAI spend, from `webapp/metrics.py` (resets on redeploy)
+- **Team** *(admin only)* — add/deactivate rep accounts, see per-rep message
+  counts and last-active timestamps
+- **System Health** *(admin only)* — in-process request/latency/error
+  metrics and an estimated OpenAI spend, from `webapp/metrics.py` (resets on
+  redeploy — team activity in the Team panel is durable, stored in Neo4j)
 
 `run_cypher` is intentionally **not** exposed here (no raw-Cypher surface for
-public users) — only the domain-specific tools.
+end users) — only the domain-specific tools.
+
+### Accounts
+
+Users are `(:User)` nodes in the same Neo4j graph (bcrypt-hashed passwords,
+`admin` or `rep` role) — see `webapp/user_store.py`. Bootstrap the first
+admin account once:
+
+```bash
+python webapp/create_admin.py <email> <name> <password> admin
+```
+
+After that, admins can add/deactivate reps from the Team panel. Deactivating
+a user locks them out immediately (every request re-checks their status in
+Neo4j, not just on next login).
 
 ### Run locally
 
@@ -106,14 +127,15 @@ python3 -m pip install -r webapp/requirements.txt
 ```
 
 Add to `.env`: `OPENAI_API_KEY`, `OPENAI_MODEL` (default `gpt-4o`),
-`APP_PASSWORD`, `SESSION_SECRET` (random string), `COOKIE_SECURE` (`false`
-locally, `true` in production).
+`SESSION_SECRET` (random string), `COOKIE_SECURE` (`false` locally, `true`
+in production).
 
 ```bash
 python3 -m uvicorn webapp.main:app --reload
 ```
 
-Open http://127.0.0.1:8000, enter the password, chat.
+Open http://127.0.0.1:8000 and sign in with an account created via
+`create_admin.py`.
 
 ### Deploy to Render
 
