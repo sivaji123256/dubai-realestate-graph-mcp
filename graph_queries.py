@@ -3,11 +3,78 @@ Query functions against the Dubai real-estate Neo4j graph (official DLD Sales
 transactions). Plain functions, no framework decorators -- shared by both
 mcp_server/server.py (wrapped as MCP tools) and webapp/ (wrapped as OpenAI
 function-calling tools).
+
+Name resolution: DLD uses its own official registry names for areas, which
+often differ from popular marketing names (e.g. "Marsa Dubai" = "Dubai
+Marina"). Rather than relying on the LLM to know/guess these mappings,
+`_resolve` below fixes typos and known aliases server-side, deterministically,
+before any Cypher runs -- so results are consistent no matter which model is
+asking.
 """
 
+import difflib
+import threading
 from typing import Optional
 
 from neo4j_client import run_read
+
+# Best-effort popular-name -> official DLD registry name aliases. Not
+# exhaustive -- unmapped names still fall through to fuzzy matching below.
+AREA_ALIASES = {
+    "dubai marina": "Marsa Dubai",
+    "the marina": "Marsa Dubai",
+    "downtown dubai": "Burj Khalifa",
+    "downtown": "Burj Khalifa",
+    "dubai hills estate": "Hadaeq Sheikh Mohammed Bin Rashid",
+    "dubai hills": "Hadaeq Sheikh Mohammed Bin Rashid",
+    "meydan": "Nad Al Shiba First",
+}
+
+_cache_lock = threading.Lock()
+_name_cache = {}
+
+
+def _cached_names(label: str, cypher: str) -> list:
+    if label not in _name_cache:
+        with _cache_lock:
+            if label not in _name_cache:
+                _name_cache[label] = [r["name"] for r in run_read(cypher)]
+    return _name_cache[label]
+
+
+def _get_area_names() -> list:
+    return _cached_names("Area", "MATCH (a:Area) RETURN a.name AS name")
+
+
+def _get_metro_names() -> list:
+    return _cached_names("MetroStation", "MATCH (m:MetroStation) RETURN m.name AS name")
+
+
+def _resolve(name: Optional[str], candidates: list, aliases: Optional[dict] = None, cutoff: float = 0.72) -> Optional[str]:
+    """Resolve a user-supplied name to the closest real entity name: exact
+    match, then alias table, then fuzzy match. Falls back to the original
+    string unchanged if nothing matches closely (so the caller still gets an
+    honest "no results" rather than a silently wrong guess)."""
+    if not name:
+        return name
+    lower_map = {c.lower(): c for c in candidates}
+    key = name.strip().lower()
+    if key in lower_map:
+        return lower_map[key]
+    if aliases and key in aliases and aliases[key].lower() in lower_map:
+        return aliases[key]
+    close = difflib.get_close_matches(key, lower_map.keys(), n=1, cutoff=cutoff)
+    if close:
+        return lower_map[close[0]]
+    return name
+
+
+def resolve_area(area: Optional[str]) -> Optional[str]:
+    return _resolve(area, _get_area_names(), AREA_ALIASES)
+
+
+def resolve_metro(metro: Optional[str]) -> Optional[str]:
+    return _resolve(metro, _get_metro_names())
 
 
 def graph_schema() -> dict:
@@ -39,6 +106,7 @@ def list_areas() -> list:
 def area_market_summary(area: str) -> dict:
     """Market summary for a Dubai area/community: transaction count, average
     price, average price per sqm, min/max price, and top property types."""
+    area = resolve_area(area)
     stats = run_read(
         """
         MATCH (t:Transaction)-[:IN_AREA]->(a:Area)
@@ -62,6 +130,7 @@ def area_market_summary(area: str) -> dict:
         area=area,
     )
     result = stats[0] if stats else {}
+    result["resolved_area_name"] = area
     result["top_property_types"] = top_types
     return result
 
@@ -76,6 +145,7 @@ def search_transactions(
 ) -> list:
     """Search individual sale transactions with optional filters. `rooms` is
     a free-text label from DLD data (e.g. "Studio", "1 B/R", "2 B/R")."""
+    area = resolve_area(area)
     return run_read(
         """
         MATCH (t:Transaction)
@@ -106,7 +176,15 @@ def search_transactions(
 def compare_areas(areas: list) -> list:
     """Side-by-side market stats (transaction count, avg price, avg price/sqm,
     avg size) for a list of area/community names."""
-    return run_read(
+    # Dedupe by resolved name -- if two inputs resolve to the same official
+    # area (e.g. "Dubai Marina" and "Marsa Dubai" are the same place), only
+    # query/return it once so counts aren't double-counted.
+    seen = {}
+    for original in areas:
+        resolved = resolve_area(original)
+        if resolved not in seen:
+            seen[resolved] = original
+    rows = run_read(
         """
         UNWIND $areas AS area_name
         OPTIONAL MATCH (t:Transaction)-[:IN_AREA]->(a:Area)
@@ -117,13 +195,17 @@ def compare_areas(areas: list) -> list:
                avg(t.price_per_sqm) AS avg_price_per_sqm,
                avg(t.area_sqm) AS avg_area_sqm
         """,
-        areas=areas,
+        areas=list(seen.keys()),
     )
+    for row in rows:
+        row["requested_as"] = seen.get(row["area_name"], row["area_name"])
+    return rows
 
 
 def top_areas_near_metro(metro: str, limit: int = 10) -> list:
     """Areas with the most sale transactions near a given metro station --
     useful for exploring metro-proximity effects on Dubai's property market."""
+    metro = resolve_metro(metro)
     return run_read(
         """
         MATCH (t:Transaction)-[:NEAR_METRO]->(m:MetroStation)
@@ -162,6 +244,7 @@ def project_lookup(project_name: str) -> dict:
 def price_trend(area: str) -> list:
     """Monthly transaction count and average price/sqm trend for an area,
     over the months currently loaded in the graph."""
+    area = resolve_area(area)
     return run_read(
         """
         MATCH (t:Transaction)-[:IN_AREA]->(a:Area)
