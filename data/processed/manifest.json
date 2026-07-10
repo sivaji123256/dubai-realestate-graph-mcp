@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-10T11:52:03.890536",
+  "generated_at": "2026-07-10T14:38:42.595006",
   "source": "kaggle:waelr1985/dubai-real-estate-transaction (DLD Transactions.csv)",
   "filter": {
     "trans_group_en": "Sales",

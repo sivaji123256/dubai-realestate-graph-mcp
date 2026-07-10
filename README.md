@@ -146,16 +146,31 @@ Open http://127.0.0.1:8000 and sign in with an account created via
 2. On [render.com](https://render.com): **New +** → **Blueprint** → connect
    this repo. Render reads `render.yaml` automatically.
 3. Fill in the env vars Render prompts for (marked `sync: false` in the
-   blueprint): `OPENAI_API_KEY`, `NEO4J_URI`, `NEO4J_PASSWORD`, `APP_PASSWORD`,
-   `SESSION_SECRET`.
+   blueprint): `OPENAI_API_KEY`, `NEO4J_URI`, `NEO4J_PASSWORD`, `SESSION_SECRET`.
 4. Deploy. First request after idle may be slow (~30-60s cold start on the
    free tier).
 
-## Refreshing with newer data
+## Keeping the data current
 
-Re-run `ingestion/fetch_data.py` (pulls the latest Kaggle snapshot), then
-`filter_transactions.py` and `load_neo4j.py` again — all writes are `MERGE`,
-so it's safe to re-run on top of existing data.
+There's no free public "live" DLD feed (the official Dubai Pulse API's
+self-service signup portal is currently non-functional) — so "live" here
+means the graph auto-syncs to the freshest available snapshot instead of
+staying frozen at a one-time load.
+
+`ingestion/check_and_refresh.py` compares the Kaggle mirror's `lastUpdated`
+timestamp against the `source_updated_at` recorded on the graph's most
+recent `DatasetVersion` node, and only re-runs the full pipeline
+(`fetch_data.py` → `filter_transactions.py` → `load_neo4j.py`) if the source
+has actually changed — otherwise it's a no-op. This runs on a schedule as
+the **"AqarIQ Data Freshness"** cloud routine (see
+https://claude.ai/code/routines), so the graph stays current without manual
+intervention. Run it manually any time with:
+
+```bash
+python ingestion/check_and_refresh.py
+```
+
+All writes are `MERGE`, so re-running is always safe.
 
 ## MCP tools
 
