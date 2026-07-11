@@ -120,6 +120,28 @@ After that, admins can add/deactivate reps from the Team panel. Deactivating
 a user locks them out immediately (every request re-checks their status in
 Neo4j, not just on next login).
 
+### Public assistant (`/public`) — no login, no company
+
+A second, separate surface at `/public`: open to anyone, no account, no
+password -- protected from abuse by an IP-based rate limit
+(`RATE_LIMIT_PUBLIC` in `webapp/auth.py`, 15 msgs/hour/IP) instead of a login
+wall. Same graph, same chat engine (`webapp/public_chat.py` shares the
+tool-calling loop with `webapp/chat.py`), different system prompt: it's
+explicit that AqarIQ is an informational assistant, not a licensed broker.
+
+When a project comes up, `project_lookup` returns a `developer` field --
+populated only when `ingestion/tag_developers.py` found the developer's own
+name literally in the project name (precision over recall: DAMAC, Azizi,
+Binghatti, Sobha, Danube, Samana, and a few others are tagged this way;
+Emaar/Nakheel/Meraas are deliberately **not** guessed at, since they use
+sub-brand names like "Downtown" or "Palm Jumeirah" instead of their own name,
+and a wrong guess would misroute a real person to the wrong company). If the
+developer is identified and the conversation signals buying interest, the
+assistant calls `developer_contact` (backed by the verified directory in
+`developer_contacts.py`) and shares their real public contact info --
+never a fabricated one. This is a lead-routing *concept*, not a live CRM
+handoff: no partnerships exist with any of these developers yet.
+
 ### Run locally
 
 ```bash

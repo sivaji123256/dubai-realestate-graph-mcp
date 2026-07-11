@@ -40,21 +40,24 @@ def get_current_user(token: Optional[str]) -> Optional[dict]:
     return user
 
 
-# Lightweight in-memory rate limiter, per user email, as a secondary guard
-# against runaway OpenAI cost on top of login. Not distributed -- fine for a
-# single Render instance; resets on redeploy/restart.
-_RATE_LIMIT_MAX = 40
+# Lightweight in-memory rate limiter -- a secondary guard against runaway
+# OpenAI cost on top of login (or, for the public endpoint, the only guard
+# since there's no login). Not distributed -- fine for a single Render
+# instance; resets on redeploy/restart.
 _RATE_LIMIT_WINDOW_SECONDS = 3600
 _hits = defaultdict(deque)
 
+RATE_LIMIT_AUTHENTICATED = 40  # per logged-in user, per hour
+RATE_LIMIT_PUBLIC = 15  # per IP, per hour -- tighter since there's no account behind it
 
-def check_rate_limit(key: str) -> bool:
+
+def check_rate_limit(key: str, max_per_hour: int = RATE_LIMIT_AUTHENTICATED) -> bool:
     """Returns True if the request is allowed, False if rate-limited."""
     now = time.time()
     window = _hits[key]
     while window and now - window[0] > _RATE_LIMIT_WINDOW_SECONDS:
         window.popleft()
-    if len(window) >= _RATE_LIMIT_MAX:
+    if len(window) >= max_per_hour:
         return False
     window.append(now)
     return True

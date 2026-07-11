@@ -11,9 +11,16 @@ import graph_queries as gq
 
 from . import config  # noqa: F401  (loads .env, extends sys.path)
 from . import metrics, user_store
-from .auth import COOKIE_NAME, check_rate_limit, create_session_token, get_current_user
+from .auth import (
+    COOKIE_NAME,
+    RATE_LIMIT_PUBLIC,
+    check_rate_limit,
+    create_session_token,
+    get_current_user,
+)
 from .chat import run_chat
 from .config import COOKIE_SECURE, OPENAI_MODEL
+from .public_chat import run_public_chat
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
@@ -39,6 +46,15 @@ class CreateUserRequest(BaseModel):
 
 def _session_token(request: Request) -> Optional[str]:
     return request.cookies.get(COOKIE_NAME)
+
+
+def _client_ip(request: Request) -> str:
+    """Render sits behind a proxy -- the real client IP is in
+    X-Forwarded-For (first entry), not request.client.host."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 def _current_user(request: Request) -> Optional[dict]:
@@ -74,6 +90,22 @@ async def track_metrics(request: Request, call_next):
 @app.get("/")
 def index():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
+
+@app.get("/public")
+def public_index():
+    return FileResponse(os.path.join(STATIC_DIR, "public.html"))
+
+
+@app.post("/api/public/chat")
+def public_chat(body: ChatRequest, request: Request):
+    ip = _client_ip(request)
+    if not check_rate_limit(f"ip:{ip}", max_per_hour=RATE_LIMIT_PUBLIC):
+        return JSONResponse({"error": "Rate limit exceeded, try again in a bit"}, status_code=429)
+    if not body.message.strip():
+        return JSONResponse({"error": "Empty message"}, status_code=400)
+    reply = run_public_chat(body.message, body.history)
+    return {"reply": reply}
 
 
 @app.post("/api/login")
@@ -116,7 +148,7 @@ def chat(body: ChatRequest, request: Request):
     user, err = _require_auth(request)
     if err is not None:
         return err
-    if not check_rate_limit(user["email"]):
+    if not check_rate_limit(f"user:{user['email']}"):
         return JSONResponse({"error": "Rate limit exceeded, try again in a bit"}, status_code=429)
     if not body.message.strip():
         return JSONResponse({"error": "Empty message"}, status_code=400)

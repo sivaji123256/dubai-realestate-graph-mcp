@@ -80,7 +80,7 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "project_lookup",
-            "description": "Look up a development project: its master project, buildings, and aggregate transaction stats for units sold within it.",
+            "description": "Look up a development project: its master project, developer (when confidently known -- null if not), buildings, and aggregate transaction stats for units sold within it.",
             "parameters": {
                 "type": "object",
                 "properties": {"project_name": {"type": "string"}},
@@ -100,6 +100,18 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "developer_contact",
+            "description": "Verified official contact info (website/email/phone) for a developer, e.g. after project_lookup identifies one. Only call this once you have an actual developer name -- if project_lookup returned developer: null, do not guess a developer name to pass here.",
+            "parameters": {
+                "type": "object",
+                "properties": {"developer_name": {"type": "string"}},
+                "required": ["developer_name"],
+            },
+        },
+    },
 ]
 
 DISPATCH = {
@@ -111,6 +123,7 @@ DISPATCH = {
     "top_areas_near_metro": lambda metro, limit=10: gq.top_areas_near_metro(metro, limit),
     "project_lookup": lambda project_name: gq.project_lookup(project_name),
     "price_trend": lambda area: gq.price_trend(area),
+    "developer_contact": lambda developer_name: gq.developer_contact(developer_name),
 }
 
 

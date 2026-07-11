@@ -38,7 +38,14 @@ MAX_HISTORY_MESSAGES = 20
 
 def run_chat(message: str, history: list) -> str:
     metrics.record_chat_message()
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    return run_chat_loop(SYSTEM_PROMPT, message, history)
+
+
+def run_chat_loop(system_prompt: str, message: str, history: list) -> str:
+    """Shared OpenAI tool-calling loop, parameterized by system prompt so
+    both the internal (chat.py) and public (public_chat.py) assistants can
+    reuse it without duplicating the loop logic."""
+    messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history[-MAX_HISTORY_MESSAGES:])
     messages.append({"role": "user", "content": message})
 

@@ -222,8 +222,9 @@ def top_areas_near_metro(metro: str, limit: int = 10) -> list:
 
 
 def project_lookup(project_name: str) -> dict:
-    """Look up a development project: its master project, buildings, and
-    aggregate transaction stats for units sold within it."""
+    """Look up a development project: its master project, developer (when
+    known -- see ingestion/tag_developers.py), buildings, and aggregate
+    transaction stats for units sold within it."""
     result = run_read(
         """
         MATCH (p:Project)
@@ -232,6 +233,7 @@ def project_lookup(project_name: str) -> dict:
         OPTIONAL MATCH (t:Transaction)-[:IN_BUILDING]->(b)
         OPTIONAL MATCH (p)-[:PART_OF]->(mp:MasterProject)
         RETURN p.name AS project, mp.name AS master_project,
+               coalesce(p.developer, mp.developer) AS developer,
                collect(DISTINCT b.name) AS buildings,
                count(DISTINCT t) AS transaction_count,
                avg(t.price) AS avg_price
@@ -239,6 +241,15 @@ def project_lookup(project_name: str) -> dict:
         project_name=project_name,
     )
     return result[0] if result else {}
+
+
+def developer_contact(developer_name: str) -> dict:
+    """Verified official contact info for a developer identified via
+    project_lookup(). Returns an honest 'not verified yet' note rather than
+    a fabricated contact if the developer isn't in the directory."""
+    from developer_contacts import get_developer_contact
+
+    return get_developer_contact(developer_name)
 
 
 def price_trend(area: str) -> list:
