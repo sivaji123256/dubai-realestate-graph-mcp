@@ -1,11 +1,19 @@
 """
-One-time (re-runnable) cleanup: merges nodes that differ only by case --
-e.g. "Business Bay" and "BUSINESS BAY" -- into a single canonical node.
+One-time (re-runnable) cleanup, two passes:
 
-Caused by ingestion/sync_buyorsell24.py writing whatever casing BuyOrSell24
-sends without checking against existing nodes first (now fixed there too,
-so this shouldn't recur going forward -- this script cleans up what already
-landed in the graph before that fix).
+1. Case-collision duplicates -- e.g. "Business Bay" and "BUSINESS BAY" --
+   caused by ingestion/sync_buyorsell24.py writing whatever casing
+   BuyOrSell24 sends. Now fixed at ingestion time too, so shouldn't recur.
+
+2. Alias-level duplicates -- e.g. "DUBAI MARINA" (a real node BuyOrSell24
+   created) vs "Marsa Dubai" (the official DLD name, used by the original
+   dataset). These don't collide case-insensitively at all -- only
+   graph_queries.AREA_ALIASES knows they're the same place. Also now fixed
+   at ingestion time (sync_buyorsell24.py runs graph_queries.resolve_area()
+   before creating a node), but that fix can't self-correct a node that
+   already exists -- an exact match on the existing stray node wins before
+   the alias table is even checked, which is why this cleanup pass is still
+   needed for anything that landed before the fix.
 
 Canonical pick: whichever variant has more incoming Transaction relationships
 (the one actually in use); ties broken toward the non-all-caps spelling.
@@ -16,6 +24,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
+from graph_queries import AREA_ALIASES  # noqa: E402
 from neo4j_client import run_read, run_write  # noqa: E402
 
 INCOMING_TRANSACTION_REL = {
@@ -105,9 +114,26 @@ def dedupe_label(label):
             merge_loser_into_canonical(label, loser, canonical)
 
 
+def dedupe_area_aliases():
+    """For each known AREA_ALIASES entry, if a stray node exists matching
+    the alias text exactly (e.g. "DUBAI MARINA" for alias key "dubai
+    marina") and the canonical target also exists as a real node, merge the
+    stray one into the canonical one."""
+    existing = {a["name"].lower(): a["name"] for a in run_read("MATCH (a:Area) RETURN a.name AS name")}
+    for alias_key, canonical in AREA_ALIASES.items():
+        stray = existing.get(alias_key)
+        if not stray or stray == canonical:
+            continue
+        if canonical.lower() not in existing:
+            continue  # canonical doesn't exist as a real node -- nothing to merge into
+        print(f"Area (alias): '{stray}' -> canonical='{canonical}'")
+        merge_loser_into_canonical("Area", stray, canonical)
+
+
 def main():
     for label in LABELS:
         dedupe_label(label)
+    dedupe_area_aliases()
 
 
 if __name__ == "__main__":

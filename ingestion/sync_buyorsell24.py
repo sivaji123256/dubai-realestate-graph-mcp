@@ -33,6 +33,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..")
 sys.path.insert(0, ROOT)
 
+from graph_queries import resolve_area  # noqa: E402
+
 from neo4j_client import run_read, run_write  # noqa: E402
 
 API_BASE = "https://api.buyorsell24.com/api/v1"
@@ -116,7 +118,14 @@ def _resolve_entity_name(label, name):
     instead of creating a new node that only differs by casing (this is what
     caused the Area/Building duplicates found and cleaned up by
     dedupe_entities.py -- BuyOrSell24 sends different casing than the
-    original dataset for the same real-world place)."""
+    original dataset for the same real-world place).
+
+    For Area specifically this runs AFTER graph_queries.resolve_area(),
+    which additionally catches alias-level duplicates -- not just casing,
+    but genuinely different names for the same place (BuyOrSell24 sent
+    "DUBAI MARINA" while the original dataset uses the official DLD name
+    "Marsa Dubai"; these don't collide case-insensitively, only via the
+    alias table, which resolve_area() already checks)."""
     if not name:
         return name
     if label not in _name_cache:
@@ -139,7 +148,7 @@ def map_record(rec):
     return {
         "id": f"bos24-{rec['id']}",
         "date": date_part,
-        "area": _resolve_entity_name("Area", none_if_blank(rec.get("area_name_en"))),
+        "area": _resolve_entity_name("Area", resolve_area(none_if_blank(rec.get("area_name_en")))),
         "building": _resolve_entity_name("Building", none_if_blank(rec.get("building_name_en"))),
         "project": _resolve_entity_name("Project", none_if_blank(rec.get("project_name_en"))),
         "master_project": _resolve_entity_name("MasterProject", none_if_blank(rec.get("master_project_en"))),

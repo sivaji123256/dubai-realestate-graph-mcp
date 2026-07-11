@@ -60,30 +60,48 @@ def _get_metro_names() -> list:
     return _cached_names("MetroStation", "MATCH (m:MetroStation) RETURN m.name AS name")
 
 
+_COMMON_SUFFIXES = [" metro station"]
+
+
+def _strip_common_suffix(s: str) -> str:
+    for suffix in _COMMON_SUFFIXES:
+        if s.endswith(suffix):
+            return s[: -len(suffix)]
+    return s
+
+
 def _resolve(name: Optional[str], candidates: list, aliases: Optional[dict] = None, cutoff: float = 0.85) -> Optional[str]:
     """Resolve a user-supplied name to the closest real entity name: exact
-    match, then alias table, then fuzzy match. Falls back to the original
-    string unchanged if nothing matches closely (so the caller still gets an
-    honest "no results" rather than a silently wrong guess).
+    match, then alias table (substring match, so "DMCC Metro Station" still
+    hits the "dmcc" alias even though it's not an exact key match), then
+    fuzzy match. Falls back to the original string unchanged if nothing
+    matches closely (so the caller still gets an honest "no results" rather
+    than a silently wrong guess).
 
-    cutoff=0.85, not the more permissive 0.72 originally used here: most
+    Fuzzy matching compares suffix-stripped forms, not raw strings: most
     metro station names share a long "Metro Station" suffix, which inflates
-    plain SequenceMatcher similarity for completely unrelated names (e.g.
-    "Zzzfake metro station" scored 0.81 against "Nakheel Metro Station" --
-    a real false positive found in testing). 0.85 still catches genuine
-    typos ("Marsha dubai" -> "Marsa Dubai" scores 0.957) while rejecting
-    that class of coincidental-suffix false match."""
+    plain SequenceMatcher similarity for completely unrelated names badly
+    enough that even a strict cutoff wasn't safe -- "DMCC Metro Station" vs
+    "ADCB Metro Station" scored above a 0.85 cutoff on raw strings (both are
+    generic-length "XXXX Metro Station" patterns with a few coincidentally
+    shared letters), a real false positive found in testing. Stripping the
+    shared suffix before comparing means the score reflects only the
+    distinctive part of the name, which is what should actually matter."""
     if not name:
         return name
     lower_map = {c.lower(): c for c in candidates}
     key = name.strip().lower()
     if key in lower_map:
         return lower_map[key]
-    if aliases and key in aliases and aliases[key].lower() in lower_map:
-        return aliases[key]
-    close = difflib.get_close_matches(key, lower_map.keys(), n=1, cutoff=cutoff)
+    if aliases:
+        for alias_key, target in aliases.items():
+            if alias_key in key and target.lower() in lower_map:
+                return target
+    stripped_key = _strip_common_suffix(key)
+    stripped_map = {_strip_common_suffix(c): c for c in lower_map}
+    close = difflib.get_close_matches(stripped_key, stripped_map.keys(), n=1, cutoff=cutoff)
     if close:
-        return lower_map[close[0]]
+        return lower_map[stripped_map[close[0]]]
     return name
 
 
