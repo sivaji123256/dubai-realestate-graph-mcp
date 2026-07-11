@@ -1,5 +1,6 @@
 .env
 data/raw/
 data/processed/*.csv
+data/manual_dld_exports/*.csv
 __pycache__/
 *.pyc

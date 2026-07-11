@@ -194,6 +194,21 @@ python ingestion/check_and_refresh.py
 
 All writes are `MERGE`, so re-running is always safe.
 
+### The honest ceiling on "live"
+
+The Kaggle mirror only updates whenever its uploader re-publishes it —
+`check_and_refresh.py` is only as fresh as that source. As of this writing
+it hasn't updated since March 2026, even though the automation checking it
+daily works correctly (it's accurately reporting "nothing new," not
+failing).
+
+The **actually current** source is DLD's own portal, which is CAPTCHA-gated
+and can't be automated. See `data/manual_dld_exports/README.md` for the
+5-minute manual process to pull a real export directly from DLD and drop it
+in for ingestion — this is the only way to get data fresher than the
+Kaggle mirror, short of paying for a commercial feed (Reidin, Property
+Monitor, ~AED 500-2,000+/month) that doesn't exist for free anywhere.
+
 ## MCP tools
 
 | Tool | Purpose |
