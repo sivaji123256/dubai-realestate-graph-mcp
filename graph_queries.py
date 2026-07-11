@@ -30,6 +30,16 @@ AREA_ALIASES = {
     "meydan": "Nad Al Shiba First",
 }
 
+# Real-world zone/freezone names people actually search by, mapped to the
+# metro station that actually serves them -- these don't share enough text
+# with the station name for fuzzy matching to ever bridge the gap (e.g.
+# "DMCC" vs "Jumeirah Lakes Towers" have no common substring), so they need
+# an explicit alias like AREA_ALIASES above, not just a lower cutoff.
+METRO_ALIASES = {
+    "dmcc": "Jumeirah Lakes Towers",
+    "jlt": "Jumeirah Lakes Towers",
+}
+
 _cache_lock = threading.Lock()
 _name_cache = {}
 
@@ -50,11 +60,19 @@ def _get_metro_names() -> list:
     return _cached_names("MetroStation", "MATCH (m:MetroStation) RETURN m.name AS name")
 
 
-def _resolve(name: Optional[str], candidates: list, aliases: Optional[dict] = None, cutoff: float = 0.72) -> Optional[str]:
+def _resolve(name: Optional[str], candidates: list, aliases: Optional[dict] = None, cutoff: float = 0.85) -> Optional[str]:
     """Resolve a user-supplied name to the closest real entity name: exact
     match, then alias table, then fuzzy match. Falls back to the original
     string unchanged if nothing matches closely (so the caller still gets an
-    honest "no results" rather than a silently wrong guess)."""
+    honest "no results" rather than a silently wrong guess).
+
+    cutoff=0.85, not the more permissive 0.72 originally used here: most
+    metro station names share a long "Metro Station" suffix, which inflates
+    plain SequenceMatcher similarity for completely unrelated names (e.g.
+    "Zzzfake metro station" scored 0.81 against "Nakheel Metro Station" --
+    a real false positive found in testing). 0.85 still catches genuine
+    typos ("Marsha dubai" -> "Marsa Dubai" scores 0.957) while rejecting
+    that class of coincidental-suffix false match."""
     if not name:
         return name
     lower_map = {c.lower(): c for c in candidates}
@@ -74,7 +92,15 @@ def resolve_area(area: Optional[str]) -> Optional[str]:
 
 
 def resolve_metro(metro: Optional[str]) -> Optional[str]:
-    return _resolve(metro, _get_metro_names())
+    return _resolve(metro, _get_metro_names(), METRO_ALIASES)
+
+
+def list_metro_stations() -> list:
+    """Every metro station name present in the graph. Some real-world zone
+    names (DMCC, JLT) don't share enough text with their actual station name
+    for fuzzy matching to bridge -- call this when a metro lookup comes back
+    empty, the same way list_areas() is the fallback for area lookups."""
+    return run_read("MATCH (m:MetroStation) RETURN m.name AS name ORDER BY name")
 
 
 def graph_schema() -> dict:

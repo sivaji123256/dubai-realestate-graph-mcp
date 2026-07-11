@@ -21,6 +21,14 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "list_metro_stations",
+            "description": 'Every metro station name present in the graph. Some real-world zone/freezone names (e.g. "DMCC", "JLT") don\'t textually resemble their actual station name ("Jumeirah Lakes Towers"). Call this if top_areas_near_metro comes back with zero results, instead of guessing a station name.',
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "area_market_summary",
             "description": "Market summary for a Dubai area/community: transaction count, average price, average price per sqm, min/max price, and top property types.",
             "parameters": {
@@ -117,6 +125,7 @@ TOOL_SCHEMAS = [
 DISPATCH = {
     "graph_schema": lambda: gq.graph_schema(),
     "list_areas": lambda: gq.list_areas(),
+    "list_metro_stations": lambda: gq.list_metro_stations(),
     "area_market_summary": lambda area: gq.area_market_summary(area),
     "search_transactions": lambda **kw: gq.search_transactions(**kw),
     "compare_areas": lambda areas: gq.compare_areas(areas),
@@ -139,6 +148,7 @@ def call_tool(name: str, arguments: dict):
 FRIENDLY_TOOL_LABELS = {
     "graph_schema": lambda a: "Checking what data is currently available...",
     "list_areas": lambda a: "Looking up official DLD area names...",
+    "list_metro_stations": lambda a: "Looking up official metro station names...",
     "area_market_summary": lambda a: f"Pulling market stats for {a.get('area', 'this area')}...",
     "search_transactions": lambda a: "Searching recent transactions...",
     "compare_areas": lambda a: f"Comparing {', '.join(a.get('areas', []) or ['areas'])}...",

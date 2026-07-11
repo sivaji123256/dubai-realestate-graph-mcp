@@ -70,6 +70,15 @@ def list_areas() -> list:
 
 
 @mcp.tool()
+def list_metro_stations() -> list:
+    """List every metro station name present in the graph. Some real-world
+    zone/freezone names (e.g. "DMCC", "JLT") don't textually resemble their
+    actual station name ("Jumeirah Lakes Towers"), so fuzzy matching alone
+    can't bridge them. Call this if top_areas_near_metro comes back empty."""
+    return gq.list_metro_stations()
+
+
+@mcp.tool()
 def area_market_summary(area: str) -> dict:
     """Market summary for a Dubai area/community: transaction count, average
     price, average price per sqm, min/max price, and top property types."""
