@@ -175,39 +175,57 @@ Open http://127.0.0.1:8000 and sign in with an account created via
 ## Keeping the data current
 
 There's no free public "live" DLD feed (the official Dubai Pulse API's
-self-service signup portal is currently non-functional) — so "live" here
-means the graph auto-syncs to the freshest available snapshot instead of
+self-service signup portal is non-functional, and DLD's own API Gateway is
+AED 30,000+/year and doesn't even include transaction data) — so "live" here
+means the graph auto-syncs to the freshest available source instead of
 staying frozen at a one-time load.
 
-`ingestion/check_and_refresh.py` compares the Kaggle mirror's `lastUpdated`
-timestamp against the `source_updated_at` recorded on the graph's most
-recent `DatasetVersion` node, and only re-runs the full pipeline
-(`fetch_data.py` → `filter_transactions.py` → `load_neo4j.py`) if the source
-has actually changed — otherwise it's a no-op. This runs on a schedule as
-the **"AqarIQ Data Freshness"** cloud routine (see
-https://claude.ai/code/routines), so the graph stays current without manual
-intervention. Run it manually any time with:
+### Primary mechanism: incremental sync from BuyOrSell24
+
+`ingestion/sync_buyorsell24.py` pulls new transactions from
+[BuyOrSell24](https://api.buyorsell24.com) (`api.buyorsell24.com`), a
+third-party API built on official DLD data via Dubai Pulse Open Data.
+Empirically verified (July 2026) to carry transactions within ~2 weeks of
+real time — dramatically fresher than the original bulk-loaded dataset.
+Free tier is 35 requests/day, 20 records/request (~700/day, close to
+Dubai's actual daily citywide sales volume).
+
+This is **forward-only, by design**: the original bulk load covers Dec
+2025–Feb 2026; this sync starts from "now" and does not backfill the gap in
+between. Doing so would add 100K+ transactions and blow past AuraDB Free's
+200K node cap. Closing that gap would need a rolling-window architecture
+(delete oldest data as new data comes in) that doesn't exist yet.
+
+A `(:SyncState {source: 'buyorsell24', cursor_date})` node tracks progress.
+Pagination is designed to self-correct if a day's volume exceeds the
+35-request budget: it clears backlog from the oldest end first and only
+advances the cursor once a date range is *fully* covered, so nothing is
+silently skipped, just deferred to the next run. All writes are `MERGE`, so
+re-running is always safe, and hitting the daily rate limit mid-run is
+handled gracefully (partial progress is saved, not lost).
+
+Runs daily as the **"AqarIQ Data Freshness"** cloud routine (see
+https://claude.ai/code/routines). Run it manually any time with:
 
 ```bash
-python ingestion/check_and_refresh.py
+python ingestion/sync_buyorsell24.py
 ```
 
-All writes are `MERGE`, so re-running is always safe.
+BuyOrSell24 is a small, unproven third-party company with no visible
+reviews or track record — the empirical test (real dated transactions,
+coherent API, a ToS that explicitly permits "application development using
+our API," which is what AqarIQ is) was enough to build on, but it's worth
+remembering this isn't an official DLD channel.
 
-### The honest ceiling on "live"
+### Fallback mechanisms (kept, not primary)
 
-The Kaggle mirror only updates whenever its uploader re-publishes it —
-`check_and_refresh.py` is only as fresh as that source. As of this writing
-it hasn't updated since March 2026, even though the automation checking it
-daily works correctly (it's accurately reporting "nothing new," not
-failing).
-
-The **actually current** source is DLD's own portal, which is CAPTCHA-gated
-and can't be automated. See `data/manual_dld_exports/README.md` for the
-5-minute manual process to pull a real export directly from DLD and drop it
-in for ingestion — this is the only way to get data fresher than the
-Kaggle mirror, short of paying for a commercial feed (Reidin, Property
-Monitor, ~AED 500-2,000+/month) that doesn't exist for free anywhere.
+- `ingestion/check_and_refresh.py` — the original Kaggle-mirror-based bulk
+  check. Kept as a fallback if BuyOrSell24 ever disappears, but that mirror
+  only updates whenever its uploader re-publishes it (unchanged since March
+  2026) — not a reliable freshness source on its own.
+- `data/manual_dld_exports/README.md` — a documented 5-minute manual
+  process to pull a real bulk export directly from DLD's own CAPTCHA-gated
+  portal, for closing the historical gap if that's ever worth doing.
 
 ## MCP tools
 
