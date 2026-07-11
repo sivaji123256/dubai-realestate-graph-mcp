@@ -1,9 +1,10 @@
+import json
 import os
 import time
 from typing import Optional
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -20,7 +21,7 @@ from .auth import (
 )
 from .chat import run_chat
 from .config import COOKIE_SECURE, OPENAI_MODEL
-from .public_chat import run_public_chat
+from .public_chat import run_public_chat, run_public_chat_stream
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
@@ -106,6 +107,24 @@ def public_chat(body: ChatRequest, request: Request):
         return JSONResponse({"error": "Empty message"}, status_code=400)
     reply = run_public_chat(body.message, body.history)
     return {"reply": reply}
+
+
+@app.post("/api/public/chat/stream")
+def public_chat_stream(body: ChatRequest, request: Request):
+    """Server-Sent Events version of /api/public/chat -- yields live
+    step events (tool calls, results) as the agent works, then a final
+    event with the answer. See webapp/chat.py's run_chat_loop_stream."""
+    ip = _client_ip(request)
+    if not check_rate_limit(f"ip:{ip}", max_per_hour=RATE_LIMIT_PUBLIC):
+        return JSONResponse({"error": "Rate limit exceeded, try again in a bit"}, status_code=429)
+    if not body.message.strip():
+        return JSONResponse({"error": "Empty message"}, status_code=400)
+
+    def event_stream():
+        for event in run_public_chat_stream(body.message, body.history):
+            yield f"data: {json.dumps(event)}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @app.post("/api/login")

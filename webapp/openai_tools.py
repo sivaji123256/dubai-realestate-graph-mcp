@@ -132,3 +132,33 @@ def call_tool(name: str, arguments: dict):
     if fn is None:
         raise ValueError(f"Unknown tool: {name}")
     return fn(**arguments)
+
+
+# Human-readable "doing X..." lines shown live while the agent works (used by
+# the streaming /public assistant -- see webapp/chat.py's run_chat_loop).
+FRIENDLY_TOOL_LABELS = {
+    "graph_schema": lambda a: "Checking what data is currently available...",
+    "list_areas": lambda a: "Looking up official DLD area names...",
+    "area_market_summary": lambda a: f"Pulling market stats for {a.get('area', 'this area')}...",
+    "search_transactions": lambda a: "Searching recent transactions...",
+    "compare_areas": lambda a: f"Comparing {', '.join(a.get('areas', []) or ['areas'])}...",
+    "top_areas_near_metro": lambda a: f"Finding areas near {a.get('metro', 'this station')}...",
+    "project_lookup": lambda a: f"Looking up {a.get('project_name', 'this project')}...",
+    "price_trend": lambda a: f"Pulling the price trend for {a.get('area', 'this area')}...",
+    "developer_contact": lambda a: f"Finding contact info for {a.get('developer_name', 'the developer')}...",
+}
+
+
+def friendly_tool_label(name: str, arguments: dict) -> str:
+    fn = FRIENDLY_TOOL_LABELS.get(name)
+    return fn(arguments) if fn else f"Running {name}..."
+
+
+def summarize_result(result) -> str:
+    if isinstance(result, list):
+        return f"Found {len(result)} result{'s' if len(result) != 1 else ''}"
+    if isinstance(result, dict):
+        if result.get("error"):
+            return "No data found"
+        return "Done"
+    return "Done"

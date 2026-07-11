@@ -306,6 +306,11 @@ html, body {
   .print-only { display: block; font-size: 1.3rem; font-weight: 700; margin-bottom: 16px; }
   .kpi-card, .chart-card { border: 1px solid #ccc; background: #fff; break-inside: avoid; }
   .kpi-value { color: #000; }
+
+  #public-screen { display: none !important; }
+  .report-view { display: block !important; max-width: 100%; padding: 0; }
+  .report-qa { border: 1px solid #ccc; background: #fff; color: #000; break-inside: avoid; }
+  .report-q, .report-a { color: #000; }
 }
 
 /* --- Mobile --- */
@@ -365,3 +370,87 @@ html, body {
   padding: 20px;
   overflow: hidden;
 }
+
+.agent-tag {
+  font-size: 0.65em;
+  font-weight: 600;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 20px;
+  vertical-align: middle;
+  margin-left: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* --- Capability grid (public intro) --- */
+.capability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  max-width: 780px;
+  margin: 20px auto 4px;
+  text-align: left;
+}
+.capability-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.capability-icon { font-size: 1.3rem; margin-bottom: 6px; }
+.capability-title { font-weight: 600; font-size: 0.88rem; margin-bottom: 4px; }
+.capability-desc { color: var(--muted); font-size: 0.78rem; line-height: 1.4; }
+
+/* --- Live agent trace --- */
+.agent-trace {
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: -4px 0 2px;
+  max-width: 70ch;
+}
+.trace-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.trace-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+.trace-line.pending .trace-dot {
+  background: var(--accent);
+  animation: trace-pulse 1s ease-in-out infinite;
+}
+.trace-line.done .trace-dot { background: var(--accent-2); }
+.trace-line.done { color: var(--text); }
+@keyframes trace-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trace-line.pending .trace-dot { animation: none; }
+}
+
+/* --- Report generation --- */
+.report-bar { padding: 4px 0 12px; }
+.report-bar.hidden { display: none; }
+
+.report-view { display: none; }
+.report-qa {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.report-q { font-weight: 600; margin-bottom: 6px; }
+.report-a { color: var(--muted); white-space: pre-wrap; line-height: 1.5; }

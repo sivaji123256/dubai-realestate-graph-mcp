@@ -142,6 +142,31 @@ assistant calls `developer_contact` (backed by the verified directory in
 never a fabricated one. This is a lead-routing *concept*, not a live CRM
 handoff: no partnerships exist with any of these developers yet.
 
+**Visible agent reasoning**: `/public` streams the agent's work in real
+time via `POST /api/public/chat/stream` (Server-Sent Events) -- each tool
+call it makes appears as a live step ("Looking up DAMAC Towers...", "Found
+26 transactions") before the final answer, instead of a black-box wait.
+`webapp/chat.py`'s `run_chat_loop_stream` is a generator shared by both
+surfaces; the internal tool's non-streaming `/api/chat` just consumes it
+and keeps the final event, unchanged behavior there. The public assistant
+also gets more tool-call rounds (`MAX_ROUNDS = 8` in `public_chat.py`) and
+an explicit prompt to chain multiple lookups for comparative questions
+("compare X and Y") rather than answering narrowly, plus a **"Generate
+report"** button that compiles the conversation into a printable one-pager
+(same `@media print` pattern as the internal dashboard).
+
+### Data quality: name de-duplication
+
+BuyOrSell24 sends area/building/project names in different casing than the
+original dataset (`BUSINESS BAY` vs `Business Bay`), which briefly created
+duplicate nodes for the same real-world place. Fixed two ways:
+`ingestion/sync_buyorsell24.py` now resolves incoming names against
+existing nodes case-insensitively before creating new ones, and
+`ingestion/dedupe_entities.py` is a one-time (re-runnable) cleanup for
+anything that already landed as a duplicate -- it merges relationships onto
+a canonical node (picked by whichever spelling has more real transactions)
+and removes the duplicate.
+
 ### Run locally
 
 ```bash

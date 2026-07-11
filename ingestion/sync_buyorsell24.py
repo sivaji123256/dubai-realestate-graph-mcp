@@ -107,6 +107,28 @@ def fetch_page(cursor_date, page):
     return body
 
 
+_name_cache = {}  # label -> {lowercased name: canonical name}
+
+
+def _resolve_entity_name(label, name):
+    """Resolves an incoming name against existing nodes of that label
+    case-insensitively, reusing the canonical spelling already in the graph
+    instead of creating a new node that only differs by casing (this is what
+    caused the Area/Building duplicates found and cleaned up by
+    dedupe_entities.py -- BuyOrSell24 sends different casing than the
+    original dataset for the same real-world place)."""
+    if not name:
+        return name
+    if label not in _name_cache:
+        rows = run_read(f"MATCH (n:{label}) RETURN n.name AS name")
+        _name_cache[label] = {r["name"].lower(): r["name"] for r in rows}
+    cache = _name_cache[label]
+    key = name.lower()
+    if key not in cache:
+        cache[key] = name  # genuinely new -- remember this casing so repeats within this run unify too
+    return cache[key]
+
+
 def map_record(rec):
     if rec.get("trans_group_en") != "Sales":
         return None
@@ -117,10 +139,10 @@ def map_record(rec):
     return {
         "id": f"bos24-{rec['id']}",
         "date": date_part,
-        "area": none_if_blank(rec.get("area_name_en")),
-        "building": none_if_blank(rec.get("building_name_en")),
-        "project": none_if_blank(rec.get("project_name_en")),
-        "master_project": none_if_blank(rec.get("master_project_en")),
+        "area": _resolve_entity_name("Area", none_if_blank(rec.get("area_name_en"))),
+        "building": _resolve_entity_name("Building", none_if_blank(rec.get("building_name_en"))),
+        "project": _resolve_entity_name("Project", none_if_blank(rec.get("project_name_en"))),
+        "master_project": _resolve_entity_name("MasterProject", none_if_blank(rec.get("master_project_en"))),
         "property_type": none_if_blank(rec.get("property_type_en")),
         "property_sub_type": none_if_blank(rec.get("property_sub_type_en")),
         "rooms": none_if_blank(rec.get("rooms_en")),

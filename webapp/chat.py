@@ -5,7 +5,7 @@ from openai import OpenAI
 
 from . import metrics
 from .config import OPENAI_API_KEY, OPENAI_MODEL
-from .openai_tools import TOOL_SCHEMAS, call_tool
+from .openai_tools import TOOL_SCHEMAS, call_tool, friendly_tool_label, summarize_result
 
 logger = logging.getLogger(__name__)
 
@@ -41,15 +41,18 @@ def run_chat(message: str, history: list) -> str:
     return run_chat_loop(SYSTEM_PROMPT, message, history)
 
 
-def run_chat_loop(system_prompt: str, message: str, history: list) -> str:
-    """Shared OpenAI tool-calling loop, parameterized by system prompt so
-    both the internal (chat.py) and public (public_chat.py) assistants can
-    reuse it without duplicating the loop logic."""
+def run_chat_loop_stream(system_prompt: str, message: str, history: list, max_rounds: int = MAX_TOOL_ROUNDS):
+    """Generator version of the tool-calling loop -- yields step events as
+    the agent works ({"type": "tool_call", ...}, {"type": "tool_result",
+    ...}) and finally {"type": "final", "content": ...}. Consumed directly
+    by the streaming /public endpoint for live visibility into what the
+    agent is doing; run_chat_loop() below wraps this for callers that just
+    want the final answer string."""
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history[-MAX_HISTORY_MESSAGES:])
     messages.append({"role": "user", "content": message})
 
-    for _ in range(MAX_TOOL_ROUNDS):
+    for _ in range(max_rounds):
         response = _client.chat.completions.create(
             model=OPENAI_MODEL,
             messages=messages,
@@ -61,7 +64,8 @@ def run_chat_loop(system_prompt: str, message: str, history: list) -> str:
         msg = response.choices[0].message
 
         if not msg.tool_calls:
-            return msg.content or ""
+            yield {"type": "final", "content": msg.content or ""}
+            return
 
         messages.append(
             {
@@ -72,16 +76,36 @@ def run_chat_loop(system_prompt: str, message: str, history: list) -> str:
         )
 
         for tc in msg.tool_calls:
+            args = json.loads(tc.function.arguments or "{}")
+            yield {
+                "type": "tool_call",
+                "tool": tc.function.name,
+                "friendly": friendly_tool_label(tc.function.name, args),
+            }
             try:
-                args = json.loads(tc.function.arguments or "{}")
                 result = call_tool(tc.function.name, args)
                 content = json.dumps(result, default=str)
+                yield {"type": "tool_result", "tool": tc.function.name, "summary": summarize_result(result)}
             except Exception as e:
                 logger.exception("Tool call failed: %s", tc.function.name)
                 content = json.dumps({"error": str(e)})
+                yield {"type": "tool_result", "tool": tc.function.name, "summary": "No data found"}
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": content})
 
-    return (
-        "I wasn't able to finish that within the allotted tool-call steps -- "
-        "try breaking it into a simpler question."
-    )
+    yield {
+        "type": "final",
+        "content": (
+            "I wasn't able to finish that within the allotted tool-call steps -- "
+            "try breaking it into a simpler question."
+        ),
+    }
+
+
+def run_chat_loop(system_prompt: str, message: str, history: list, max_rounds: int = MAX_TOOL_ROUNDS) -> str:
+    """Non-streaming wrapper around run_chat_loop_stream -- returns just the
+    final answer text. Used by the internal (authenticated) chat, which
+    doesn't need live step visibility."""
+    for event in run_chat_loop_stream(system_prompt, message, history, max_rounds):
+        if event["type"] == "final":
+            return event["content"]
+    return ""
