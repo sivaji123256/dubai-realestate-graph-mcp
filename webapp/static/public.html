@@ -6,6 +6,9 @@
   <title>AqarIQ Agent — Free Dubai Real Estate Assistant</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230b1220'/%3E%3Ctext x='50' y='68' font-size='58' font-family='Georgia,serif' font-weight='bold' fill='%23c9a24b' text-anchor='middle'%3EA%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/static/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/vis-network@9/styles/vis-network.min.css" />
   <script src="https://unpkg.com/vis-network@9/standalone/umd/vis-network.min.js"></script>
@@ -13,38 +16,23 @@
 <body>
   <div id="public-screen" class="screen">
     <header class="public-header">
-      <div class="brand-mark">Aqar<span>IQ</span> <span class="agent-tag">Agent</span></div>
-      <p class="subtitle">A free AI agent for Dubai real estate — live data from official DLD transactions, working the problem in front of you, not reciting a script.</p>
-
-      <div class="capability-grid">
-        <div class="capability-card">
-          <div class="capability-icon">📡</div>
-          <div class="capability-title">Live market data</div>
-          <div class="capability-desc">Real DLD sale transactions, synced daily — not stale listings or asking prices.</div>
-        </div>
-        <div class="capability-card">
-          <div class="capability-icon">🔎</div>
-          <div class="capability-title">Multi-step research</div>
-          <div class="capability-desc">Ask it to compare areas, projects, or metro access in one go — it runs every lookup needed and synthesizes an answer, visibly, step by step.</div>
-        </div>
-        <div class="capability-card">
-          <div class="capability-icon">🤝</div>
-          <div class="capability-title">Connects you to the right company</div>
-          <div class="capability-desc">Identifies who built a project and hands you their real, verified contact — never a guess.</div>
-        </div>
-        <div class="capability-card">
-          <div class="capability-icon">📄</div>
-          <div class="capability-title">Free, no signup</div>
-          <div class="capability-desc">Open to anyone. Not a licensed broker — for viewings and offers, it connects you to one.</div>
-        </div>
+      <div class="hero-eyebrow">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span class="hero-eyebrow-text">Dubai Land Department · Registered Transactions</span>
+        <span class="hero-eyebrow-time" id="syncTime"></span>
       </div>
+      <div class="hero-masthead">
+        <h1 class="wordmark"><span class="w-aqar">Aqar</span><span class="w-iq">IQ</span></h1>
+        <div class="stamp">Verified Agent</div>
+      </div>
+      <p class="hero-tagline">A free AI agent for Dubai real estate — live data from official DLD transactions, working the problem in front of you, not reciting a script.</p>
     </header>
 
-    <nav class="public-nav">
-      <button class="nav-btn active" data-panel="chat">Chat</button>
-      <button class="nav-btn" data-panel="dashboard">Dashboard</button>
-      <button class="nav-btn" data-panel="graph">Graph Explorer</button>
-      <button class="nav-btn" data-panel="stats">Stats</button>
+    <nav class="public-nav" role="tablist" aria-label="AqarIQ sections">
+      <button class="nav-btn active" role="tab" aria-selected="true" data-panel="chat">Chat</button>
+      <button class="nav-btn" role="tab" aria-selected="false" data-panel="dashboard">Dashboard</button>
+      <button class="nav-btn" role="tab" aria-selected="false" data-panel="graph">Graph Explorer</button>
+      <button class="nav-btn" role="tab" aria-selected="false" data-panel="stats">Stats</button>
     </nav>
 
     <main class="content public-content">
@@ -57,7 +45,9 @@
         </div>
         <form id="chat-form">
           <input id="chat-input" type="text" placeholder="e.g. Compare 2-bedroom prices in JVC and Business Bay" autocomplete="off" />
-          <button type="submit">Send</button>
+          <button type="submit">Ask
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
         </form>
       </section>
 
@@ -105,6 +95,37 @@
         <div id="stats-cards" class="kpi-grid"></div>
         <p id="stats-freshness" class="footnote"></p>
       </section>
+
+      <!-- Live ticker: real data, not a mockup -->
+      <div class="ticker-wrap">
+        <div class="ticker-label">Live feed · top areas by transaction volume</div>
+        <div class="ticker-mask">
+          <div class="ticker-track" id="tickerTrack"></div>
+        </div>
+      </div>
+
+      <div class="capability-grid" id="capabilityGrid">
+        <button class="capability-card" type="button" data-panel="dashboard">
+          <div class="capability-icon">📡</div>
+          <div class="capability-title">Live market data</div>
+          <div class="capability-desc">Real DLD sale transactions, synced daily — not stale listings or asking prices.</div>
+        </button>
+        <button class="capability-card" type="button" data-panel="chat" data-prompt="Compare 2-bedroom prices in JVC and Business Bay">
+          <div class="capability-icon">🔎</div>
+          <div class="capability-title">Multi-step research</div>
+          <div class="capability-desc">Ask it to compare areas, projects, or metro access in one go — it runs every lookup needed and synthesizes an answer, visibly, step by step.</div>
+        </button>
+        <button class="capability-card" type="button" data-panel="chat" data-prompt="Who developed Damac Hills and how do I get in touch?">
+          <div class="capability-icon">🤝</div>
+          <div class="capability-title">Connects you to the right company</div>
+          <div class="capability-desc">Identifies who built a project and hands you their real, verified contact — never a guess.</div>
+        </button>
+        <button class="capability-card" type="button" data-panel="stats">
+          <div class="capability-icon">📄</div>
+          <div class="capability-title">Free, no signup</div>
+          <div class="capability-desc">Open to anyone. Not a licensed broker — for viewings and offers, it connects you to one.</div>
+        </button>
+      </div>
     </main>
   </div>
 
@@ -119,5 +140,6 @@
   <script src="/static/dashboard.js"></script>
   <script src="/static/graph.js"></script>
   <script src="/static/stats.js"></script>
+  <script src="/static/ticker.js"></script>
 </body>
 </html>
