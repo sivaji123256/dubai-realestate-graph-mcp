@@ -1,3 +1,5 @@
+const GRAPH_API = window.AQARIQ_API_PREFIX || "/api";
+
 const areaSelect = document.getElementById("area-select");
 const graphCanvas = document.getElementById("graph-canvas");
 const graphLegend = document.getElementById("graph-legend");
@@ -17,7 +19,7 @@ let areasLoaded = false;
 
 async function initGraph() {
   if (!areasLoaded) {
-    const areas = await apiGet("/api/graph/areas");
+    const areas = await apiGet(`${GRAPH_API}/graph/areas`);
     for (const a of areas) {
       const opt = document.createElement("option");
       opt.value = a.name;
@@ -37,7 +39,7 @@ areaSelect.addEventListener("change", async () => {
   if (!area) return;
   graphCanvas.innerHTML = '<p class="footnote">Loading subgraph…</p>';
 
-  const data = await apiGet(`/api/graph/area-subgraph?area=${encodeURIComponent(area)}`);
+  const data = await apiGet(`${GRAPH_API}/graph/area-subgraph?area=${encodeURIComponent(area)}`);
 
   const nodes = new vis.DataSet(
     data.nodes.map((n) => ({

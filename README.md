@@ -155,6 +155,24 @@ an explicit prompt to chain multiple lookups for comparative questions
 report"** button that compiles the conversation into a printable one-pager
 (same `@media print` pattern as the internal dashboard).
 
+**Multi-tab platform**: `/public` isn't just a chat widget -- it has the
+same four-tab shell as the internal tool (Chat / Dashboard / Graph
+Explorer / Stats), via `webapp/static/public_shell.js` (a login-free
+sibling of `app.js`'s tab-switching + `apiGet`, since public routes 429 on
+abuse instead of 401 on missing auth). Dashboard and Graph Explorer reuse
+the exact same `dashboard.js`/`graph.js` as the internal tool -- both read
+a page-level `window.AQARIQ_API_PREFIX` instead of hardcoding `/api/...`,
+so `/public` points them at `/api/public/...` while `/` keeps defaulting to
+`/api`. Those public routes (`webapp/main.py`) call the identical
+`graph_queries.py` functions the internal dashboard uses, gated only by a
+generous 60/hour/IP read limit (`RATE_LIMIT_PUBLIC_READ`) since they're
+pure Neo4j reads with no OpenAI cost. The **Stats** tab
+(`webapp/static/stats.js`, `GET /api/public/stats`) is deliberately
+public-safe: transaction counts, area coverage, data freshness, and
+uptime -- `metrics.public_snapshot()` excludes OpenAI spend, token counts,
+and request volume, which stay admin-only on the internal tool's System
+Health panel.
+
 ### Data quality: name de-duplication
 
 BuyOrSell24 sends area/building/project names in different casing than the

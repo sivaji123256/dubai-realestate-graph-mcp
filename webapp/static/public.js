@@ -99,8 +99,13 @@ function updateReportContent() {
   }
 }
 
+window.addEventListener("afterprint", () => {
+  document.body.classList.remove("printing-report");
+});
+
 reportBtn.addEventListener("click", () => {
   updateReportContent();
+  document.body.classList.add("printing-report");
   window.print();
 });
 

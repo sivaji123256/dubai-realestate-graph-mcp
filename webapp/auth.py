@@ -49,6 +49,7 @@ _hits = defaultdict(deque)
 
 RATE_LIMIT_AUTHENTICATED = 40  # per logged-in user, per hour
 RATE_LIMIT_PUBLIC = 15  # per IP, per hour -- tighter since there's no account behind it
+RATE_LIMIT_PUBLIC_READ = 60  # per IP, per hour -- dashboard/graph reads have no OpenAI cost, more generous
 
 
 def check_rate_limit(key: str, max_per_hour: int = RATE_LIMIT_AUTHENTICATED) -> bool:

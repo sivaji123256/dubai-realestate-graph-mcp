@@ -15,6 +15,7 @@ from . import metrics, user_store
 from .auth import (
     COOKIE_NAME,
     RATE_LIMIT_PUBLIC,
+    RATE_LIMIT_PUBLIC_READ,
     check_rate_limit,
     create_session_token,
     get_current_user,
@@ -79,6 +80,15 @@ def _require_admin(request: Request):
     return user, None
 
 
+def _require_public_read(request: Request) -> Optional[JSONResponse]:
+    """No auth needed (these are public read-only Neo4j queries, no OpenAI
+    cost) -- just a generous per-IP rate limit against scraping."""
+    ip = _client_ip(request)
+    if not check_rate_limit(f"ip-read:{ip}", max_per_hour=RATE_LIMIT_PUBLIC_READ):
+        return JSONResponse({"error": "Rate limit exceeded, try again in a bit"}, status_code=429)
+    return None
+
+
 @app.middleware("http")
 async def track_metrics(request: Request, call_next):
     start = time.perf_counter()
@@ -125,6 +135,64 @@ def public_chat_stream(body: ChatRequest, request: Request):
             yield f"data: {json.dumps(event)}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@app.get("/api/public/dashboard/kpis")
+def public_dashboard_kpis(request: Request):
+    if (err := _require_public_read(request)) is not None:
+        return err
+    return gq.citywide_kpis()
+
+
+@app.get("/api/public/dashboard/top-areas")
+def public_dashboard_top_areas(request: Request, limit: int = 10):
+    if (err := _require_public_read(request)) is not None:
+        return err
+    return gq.top_areas_by_volume(limit)
+
+
+@app.get("/api/public/dashboard/price-trend")
+def public_dashboard_price_trend(request: Request):
+    if (err := _require_public_read(request)) is not None:
+        return err
+    return gq.citywide_monthly_trend()
+
+
+@app.get("/api/public/dataset/versions")
+def public_dataset_versions(request: Request):
+    if (err := _require_public_read(request)) is not None:
+        return err
+    return gq.dataset_versions()
+
+
+@app.get("/api/public/graph/areas")
+def public_graph_areas(request: Request):
+    if (err := _require_public_read(request)) is not None:
+        return err
+    return gq.list_areas()
+
+
+@app.get("/api/public/graph/area-subgraph")
+def public_graph_area_subgraph(request: Request, area: str):
+    if (err := _require_public_read(request)) is not None:
+        return err
+    return gq.area_subgraph(area)
+
+
+@app.get("/api/public/stats")
+def public_stats(request: Request):
+    if (err := _require_public_read(request)) is not None:
+        return err
+    kpis = gq.citywide_kpis()
+    versions = gq.dataset_versions()
+    return {
+        "total_transactions": kpis["total_transactions"],
+        "area_count": kpis["area_count"],
+        "earliest": kpis["earliest"],
+        "latest": kpis["latest"],
+        "latest_bulk_load": versions[0] if versions else None,
+        **metrics.public_snapshot(),
+    }
 
 
 @app.post("/api/login")

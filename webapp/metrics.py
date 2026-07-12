@@ -56,6 +56,16 @@ def estimate_cost_usd(model: str) -> float:
     return (_prompt_tokens / 1_000_000) * price["prompt"] + (_completion_tokens / 1_000_000) * price["completion"]
 
 
+def public_snapshot() -> dict:
+    """Public-safe subset for the /public Stats tab -- deliberately just
+    uptime. No spend, tokens, or request/error counts: those are internal
+    operational data about the business running this, not something an
+    anonymous visitor should see (unlike snapshot() below, which is
+    admin-only on the internal tool)."""
+    with _lock:
+        return {"uptime_seconds": round(time.time() - _start_time)}
+
+
 def snapshot(model: str) -> dict:
     with _lock:
         latencies = list(_latencies_ms)

@@ -1,3 +1,5 @@
+const DASHBOARD_API = window.AQARIQ_API_PREFIX || "/api";
+
 let topAreasChart = null;
 let priceTrendChart = null;
 
@@ -17,10 +19,10 @@ function kpiCard(label, value) {
 
 async function initDashboard() {
   const [kpis, topAreas, priceTrend, versions] = await Promise.all([
-    apiGet("/api/dashboard/kpis"),
-    apiGet("/api/dashboard/top-areas?limit=8"),
-    apiGet("/api/dashboard/price-trend"),
-    apiGet("/api/dataset/versions"),
+    apiGet(`${DASHBOARD_API}/dashboard/kpis`),
+    apiGet(`${DASHBOARD_API}/dashboard/top-areas?limit=8`),
+    apiGet(`${DASHBOARD_API}/dashboard/price-trend`),
+    apiGet(`${DASHBOARD_API}/dataset/versions`),
   ]);
 
   const kpiGrid = document.getElementById("kpi-cards");

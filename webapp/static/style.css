@@ -300,15 +300,19 @@ html, body {
 
 /* --- Print (Dashboard export) --- */
 @media print {
-  .sidebar, .no-print, #quick-prompts, #chat-form { display: none !important; }
+  .sidebar, .no-print, .public-header, .public-nav, #quick-prompts, #chat-form { display: none !important; }
   #app-shell, .content, .panel { display: block !important; height: auto !important; overflow: visible !important; }
   body { background: #fff; color: #000; }
   .print-only { display: block; font-size: 1.3rem; font-weight: 700; margin-bottom: 16px; }
   .kpi-card, .chart-card { border: 1px solid #ccc; background: #fff; break-inside: avoid; }
   .kpi-value { color: #000; }
 
-  #public-screen { display: none !important; }
-  .report-view { display: block !important; max-width: 100%; padding: 0; }
+  /* Printing the QA report (public.js sets this before window.print()) swaps
+     out the whole tabbed screen in favor of report-view; printing a panel
+     directly (e.g. the Dashboard's own print button) leaves #public-screen
+     visible so that panel's content prints instead. */
+  body.printing-report #public-screen { display: none !important; }
+  body.printing-report .report-view { display: block !important; max-width: 100%; padding: 0; }
   .report-qa { border: 1px solid #ccc; background: #fff; color: #000; break-inside: avoid; }
   .report-q, .report-a { color: #000; }
 }
@@ -343,7 +347,7 @@ html, body {
 #public-screen {
   display: flex;
   flex-direction: column;
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 
@@ -363,12 +367,19 @@ html, body {
   line-height: 1.4;
 }
 
+.public-nav {
+  display: flex;
+  gap: 6px;
+  padding: 10px 20px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.public-nav .nav-btn { padding: 10px 16px; white-space: nowrap; }
+
 .public-content {
   flex: 1;
-  display: flex;
-  flex-direction: column;
+  overflow-y: auto;
   padding: 20px;
-  overflow: hidden;
 }
 
 .agent-tag {
